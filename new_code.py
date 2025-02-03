@@ -8,12 +8,12 @@ from PIL import Image
 cm = 1.0*10**-2
 um = 1.0*10**-6
 # Constants for reconstruction
-z = 6 # Propagation distance
+z = 25 # Propagation distance
 wavelength = .52*um # Wavelength (adjust this value as needed)
 pix = 3.45*um  # Pixel size (adjust this value as needed)
 
 # Load the BMP files
-import11 = Image.open("6cm.bmp")
+import11 = Image.open("1.bmp")
 import22 = Image.open("background-elongated.bmp")
 
 # Crop the images to 2048 x 2048 if they are not already
@@ -76,18 +76,11 @@ holo1 = RegularGridInterpolator((x, y), holoDat)
 new_x = np.arange(-dimX, dimX + 1)  # New x grid points
 new_y = np.arange(-dimY, dimY + 1)  # New y grid points
 
-# Create a meshgrid for the new points
-new_xx, new_yy = np.meshgrid(new_x, new_y, indexing='ij')
-
-# Evaluate the interpolator at the new points
-#points = np.column_stack((new_xx.ravel(), new_yy.ravel()))  # Combine into (x, y) pairs
-#holoDat1 = holo1(points).reshape(new_xx.shape)  # Reshape to match the grid
-
 aveDat = trim_mean(holoDat1.flatten(), 0.33)  # Trimmed mean of the hologram data
 holoDat2 = holoDat1 - aveDat
 
-
-dim = len(holoDat1)  # Get the dimensions of
+dim = len(holoDat2)  # Get the dimensions of
+print(dim)
 
 # Create the grid points
 x = np.arange(1, dim + 1)
@@ -95,7 +88,6 @@ y = np.arange(1, dim + 1)
 
 # Create the interpolator
 hologram1 = RegularGridInterpolator((x, y), holoDat2)
-recon1 = np.zeros((dim, dim), dtype=complex)  # Initialize the result array
 
 # Create grids for i and j (1-based indexing)
 i = np.arange(1, dim + 1)
@@ -114,7 +106,7 @@ hologram_values = hologram1(points).reshape(ii.shape)  # Evaluate and reshape
 recon1 = hologram_values * np.exp(exponent)
 
 # Apply "Chop" by setting small values to zero
-recon1 = np.where(np.abs(recon1) < 10^-10, 0, recon1)
+recon1 = np.where(np.abs(recon1) < 10**-10, 0, recon1)
 recon = np.fft.fft2(recon1)
 window = dim / 2
 
@@ -127,28 +119,12 @@ y = np.linspace(-window, window, abs_recon_squared.shape[1])  # Grid points alon
 # Create the interpolator
 view1 = RegularGridInterpolator((x, y), abs_recon_squared)
 
-x_plot = np.linspace(-window, window, 600)  # 300 points along x-axis
-y_plot = np.linspace(-window, window, 600)  # 300 points along y-axis
+x_plot = np.linspace(-window, window, 2048)  # 300 points along x-axis
+y_plot = np.linspace(-window, window, 2048)  # 300 points along y-axis
 xx, yy = np.meshgrid(x_plot, y_plot, indexing='ij')
 
 # Evaluate view1 at the grid points
 z_plot = -view1((xx, yy))  # Negative of view1, as in Mathematica
-
-# Shift the zero-frequency component to the center
-z_shifted = np.fft.fftshift(z_plot)
-
-# Normalize the shifted data
-z_shifted_normalized = (z_shifted - np.min(z_shifted)) / (np.max(z_shifted) - np.min(z_shifted))
-
-# Create a grayscale plot with the shifted data
-plt.figure(figsize=(10, 8))
-plt.imshow(z_shifted_normalized, cmap='gray', origin='lower')
-plt.xlabel("x[pix]", fontsize=30)
-plt.ylabel("y[pix]", fontsize=30)
-plt.title("reconstructed image")
-plt.axis('on')  # Show axes for reference
-plt.savefig('reconstructed_image_fftshifted.png', bbox_inches='tight', pad_inches=0, dpi=300)  # Save as PNG
-plt.close()  # Close the plot to free memory
 
 # Create the density plot
 plt.figure(figsize=(6, 6))  # Set image size (600x600 in Mathematica corresponds to 10x8 in matplotlib)
