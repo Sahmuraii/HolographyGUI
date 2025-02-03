@@ -62,85 +62,73 @@ plt.show()
 # ------------------- Reconstruction -------------------
 holoDat = contrast
 
-dimX = holoDat.shape[0] // 2
-dimY = holoDat.shape[1] // 2
+# Use full resolution for reconstruction
+dimX = holoDat.shape[0]
+dimY = holoDat.shape[1]
 
 # Define the grid points
-x = np.linspace(-dimX, dimX, holoDat.shape[0])  # Grid points along the x-axis
-y = np.linspace(-dimY, dimY, holoDat.shape[1])  # Grid points along the y-axis
+x = np.linspace(-dimX / 2, dimX / 2, dimX)
+y = np.linspace(-dimY / 2, dimY / 2, dimY)
 
-# Create the interpolator
-holo1 = RegularGridInterpolator((x, y), holoDat)
+# Create the interpolator for holoDat1
+holo1 = RegularGridInterpolator((y, x), contrast)
 
-# Generate new grid points for interpolation
-new_x = np.arange(-dimX, dimX + 1)  # New x grid points
-new_y = np.arange(-dimY, dimY + 1)  # New y grid points
+# Generate new grid points for interpolation (full resolution)
+xx, yy = np.meshgrid(x, y, indexing="ij")
+holoDat1 = holo1((yy, xx))
 
+# Calculate holoDat2 (background-subtracted hologram)
 aveDat = trim_mean(holoDat1.flatten(), 0.33)  # Trimmed mean of the hologram data
 holoDat2 = holoDat1 - aveDat
 
-dim = len(holoDat2)  # Get the dimensions of
-print(dim)
-
-# Create the grid points
-x = np.arange(1, dim + 1)
-y = np.arange(1, dim + 1)
-
-# Create the interpolator
-hologram1 = RegularGridInterpolator((x, y), holoDat2)
-
-# Create grids for i and j (1-based indexing)
-i = np.arange(1, dim + 1)
-j = np.arange(1, dim + 1)
+# Create the grid points for reconstruction
+i = np.arange(1, dimX + 1)
+j = np.arange(1, dimY + 1)
 ii, jj = np.meshgrid(i, j, indexing='ij')
 
 # Compute the exponent term
 exponent = (1j * np.pi / wavelength * z) * ((ii - 1)**2 * pix**2 + (jj - 1)**2 * pix**2)
 
-# Evaluate hologram1 at the grid points (i, j)
-# RegularGridInterpolator expects input as a 2D array of shape (N, 2)
+# Evaluate holoDat2 at the grid points (full resolution)
 points = np.column_stack((ii.ravel(), jj.ravel()))  # Combine into (i, j) pairs
-hologram_values = hologram1(points).reshape(ii.shape)  # Evaluate and reshape
+hologram_values = holoDat2.reshape(-1)  # Use holoDat2 directly (no interpolation needed)
 
 # Compute recon1
-recon1 = hologram_values * np.exp(exponent)
+recon1 = hologram_values * np.exp(exponent.ravel())
+
+# Reshape recon1 back to 2D
+recon1 = recon1.reshape(ii.shape)
 
 # Apply "Chop" by setting small values to zero
 recon1 = np.where(np.abs(recon1) < 10**-10, 0, recon1)
-recon = np.fft.fft2(recon1)
-window = dim / 2
 
+# Apply FFT (full resolution)
+recon = np.fft.fft2(recon1)
+
+# Compute the squared magnitude of the reconstructed field
 abs_recon_squared = np.abs(recon)**2
 
 # Define the grid points for interpolation
+window = dimX / 2  # Use full resolution for the window
 x = np.linspace(-window, window, abs_recon_squared.shape[0])  # Grid points along the x-axis
 y = np.linspace(-window, window, abs_recon_squared.shape[1])  # Grid points along the y-axis
 
-# Create the interpolator
+# Create the interpolator for the reconstructed field
 view1 = RegularGridInterpolator((x, y), abs_recon_squared)
 
-x_plot = np.linspace(-window, window, 2048)  # 300 points along x-axis
-y_plot = np.linspace(-window, window, 2048)  # 300 points along y-axis
-xx, yy = np.meshgrid(x_plot, y_plot, indexing='ij')
+# Define the plotting grid
+x_plot = np.linspace(-window, window, 2048)  # High-resolution grid for plotting
+y_plot = np.linspace(-window, window, 2048)  # High-resolution grid for plotting
+xx_plot, yy_plot = np.meshgrid(x_plot, y_plot, indexing='ij')
 
-# Evaluate view1 at the grid points
-z_plot = -view1((xx, yy))  # Negative of view1, as in Mathematica
+# Evaluate the interpolated reconstructed field (negative of view1)
+z_plot = -view1((xx_plot, yy_plot))
 
-# Create the density plot
-plt.figure(figsize=(6, 6))  # Set image size (600x600 in Mathematica corresponds to 10x8 in matplotlib)
-plt.imshow(z_plot, extent=[-window, window, -window, window], 
-           cmap='gray', origin='lower',)  # Create the density plot
-
-# Add labels and title
-plt.xlabel("x[pix]")
-plt.ylabel("y[pix]")
-plt.title("reconstructed image")
-
-# Customize the plot
-plt.colorbar(label="Intensity")  # Add a colorbar
-plt.xticks()  # Set x-axis tick font
-plt.yticks()  # Set y-axis tick font
-plt.grid(False)  # Disable grid (Mathematica's DensityPlot doesn't show a grid by default)
-
-# Show the plot
+# Plot the reconstructed image
+plt.figure(figsize=(6, 6))
+plt.imshow(z_plot, cmap='gray', extent=[-window, window, -window, window], origin='lower')
+plt.colorbar(label="Intensity")
+plt.xlabel("x [pix]")
+plt.ylabel("y [pix]")
+plt.title("Reconstructed Image (Negative of View)")
 plt.show()
