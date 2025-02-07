@@ -1,15 +1,18 @@
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
-from scipy.stats import trim_mean
-from scipy.fft import fft
 import matplotlib.pyplot as plt
 from PIL import Image
+from pyDHM import utilities
+from pyDHM import phaseShifting
+from pyDHM import numericalPropagation
+from pyDHM import phaseCompensation
 
 cm = 1.0*10**-2
 um = 1.0*10**-6
+nm = 1.0*10**-9
 # Constants for reconstruction
 z = 25 # Propagation distance
-wavelength = .52*um # Wavelength (adjust this value as needed)
+wavelength = 532*nm # Wavelength (adjust this value as needed)
 pix = 3.45*um  # Pixel size (adjust this value as needed)
 
 # Load the BMP files
@@ -59,76 +62,49 @@ plt.ylabel("y [pix]")
 plt.title("Contrast Hologram")
 plt.show()
 
+# Save the gray mapped image
+gray_image = Image.fromarray(holoDat1)
+gray_image = gray_image.convert("L")
+gray_image.save("holoDat1.png")
+
+
 # ------------------- Reconstruction -------------------
-holoDat = contrast
 
-# Use full resolution for reconstruction
-dimX = holoDat.shape[0]
-dimY = holoDat.shape[1]
 
-# Define the grid points
-x = np.linspace(-dimX / 2, dimX / 2, dimX)
-y = np.linspace(-dimY / 2, dimY / 2, dimY)
+# Convert the hologram data to a complex field
+# Assuming the contrast hologram is the real part, and the imaginary part is zero
+complex_field = holoDat1.astype(np.complex128)
 
-# Create the interpolator for holoDat1
-holo1 = RegularGridInterpolator((y, x), contrast)
+# Perform numerical propagation using the angular spectrum method
+reconstructed_field = numericalPropagation.angularSpectrum(complex_field, 30000, .532, 3.5, 3.5)
 
-# Generate new grid points for interpolation (full resolution)
-xx, yy = np.meshgrid(x, y, indexing="ij")
-holoDat1 = holo1((yy, xx))
+# Extract the amplitude and phase of the reconstructed field
+amplitude = np.abs(reconstructed_field)
+phase = np.angle(reconstructed_field)
 
-# Calculate holoDat2 (background-subtracted hologram)
-aveDat = trim_mean(holoDat1.flatten(), 0.33)  # Trimmed mean of the hologram data
-holoDat2 = holoDat1 - aveDat
-
-# Create the grid points for reconstruction
-i = np.arange(1, dimX + 1)
-j = np.arange(1, dimY + 1)
-ii, jj = np.meshgrid(i, j, indexing='ij')
-
-# Compute the exponent term
-exponent = (1j * np.pi / wavelength * z) * ((ii - 1)**2 * pix**2 + (jj - 1)**2 * pix**2)
-
-# Evaluate holoDat2 at the grid points (full resolution)
-points = np.column_stack((ii.ravel(), jj.ravel()))  # Combine into (i, j) pairs
-hologram_values = holoDat2.reshape(-1)  # Use holoDat2 directly (no interpolation needed)
-
-# Compute recon1
-recon1 = hologram_values * np.exp(exponent.ravel())
-
-# Reshape recon1 back to 2D
-recon1 = recon1.reshape(ii.shape)
-
-# Apply "Chop" by setting small values to zero
-recon1 = np.where(np.abs(recon1) < 10**-10, 0, recon1)
-
-# Apply FFT (full resolution)
-recon = np.fft.fft2(recon1)
-
-# Compute the squared magnitude of the reconstructed field
-abs_recon_squared = np.abs(recon)**2
-
-# Define the grid points for interpolation
-window = dimX / 2  # Use full resolution for the window
-x = np.linspace(-window, window, abs_recon_squared.shape[0])  # Grid points along the x-axis
-y = np.linspace(-window, window, abs_recon_squared.shape[1])  # Grid points along the y-axis
-
-# Create the interpolator for the reconstructed field
-view1 = RegularGridInterpolator((x, y), abs_recon_squared)
-
-# Define the plotting grid
-x_plot = np.linspace(-window, window, 2048)  # High-resolution grid for plotting
-y_plot = np.linspace(-window, window, 2048)  # High-resolution grid for plotting
-xx_plot, yy_plot = np.meshgrid(x_plot, y_plot, indexing='ij')
-
-# Evaluate the interpolated reconstructed field (negative of view1)
-z_plot = -view1((xx_plot, yy_plot))
-
-# Plot the reconstructed image
+# Plot the amplitude of the reconstructed field
 plt.figure(figsize=(6, 6))
-plt.imshow(z_plot, cmap='gray', extent=[-window, window, -window, window], origin='lower')
+plt.imshow(amplitude, cmap="gray", extent=[-dimX / 2, dimX / 2, -dimY / 2, dimY / 2])
 plt.colorbar(label="Intensity")
 plt.xlabel("x [pix]")
 plt.ylabel("y [pix]")
-plt.title("Reconstructed Image (Negative of View)")
+plt.title("Reconstructed Amplitude (Angular Spectrum)")
 plt.show()
+
+# Plot the phase of the reconstructed field
+plt.figure(figsize=(6, 6))
+plt.imshow(phase, cmap="gray", extent=[-dimX / 2, dimX / 2, -dimY / 2, dimY / 2])
+plt.colorbar(label="Phase [rad]")
+plt.xlabel("x [pix]")
+plt.ylabel("y [pix]")
+plt.title("Reconstructed Phase (Angular Spectrum)")
+plt.show()
+
+# Save the reconstructed amplitude and phase images
+amplitude_image = Image.fromarray((amplitude / np.max(amplitude) * 255).astype(np.uint8))
+amplitude_image = amplitude_image.convert("L")
+amplitude_image.save("reconstructed_amplitude_angular_spectrum.png")
+
+phase_image = Image.fromarray((phase / np.max(phase) * 255).astype(np.uint8))
+phase_image = phase_image.convert("L")
+phase_image.save("reconstructed_phase_angular_spectrum.png")
