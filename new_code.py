@@ -2,10 +2,12 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 import matplotlib.pyplot as plt
 from PIL import Image
-from pyDHM import utilities
-from pyDHM import phaseShifting
 from pyDHM import numericalPropagation
-from pyDHM import phaseCompensation
+from skimage.measure import label, regionprops, profile_line
+from skimage.filters import threshold_otsu
+from matplotlib.widgets import Line2D
+
+import matplotlib.pyplot as plt
 
 cm = 1.0*10**-2
 um = 1.0*10**-6
@@ -16,7 +18,7 @@ wavelength = 532*nm # Wavelength (adjust this value as needed)
 pix = 3.45*um  # Pixel size (adjust this value as needed)
 
 # Load the BMP files
-import11 = Image.open("1.bmp")
+import11 = Image.open("6.bmp")
 import22 = Image.open("background-elongated.bmp")
 
 # Crop the images to 2048 x 2048 if they are not already
@@ -70,7 +72,6 @@ gray_image.save("holoDat1.png")
 
 # ------------------- Reconstruction -------------------
 
-
 # Convert the hologram data to a complex field
 # Assuming the contrast hologram is the real part, and the imaginary part is zero
 complex_field = holoDat1.astype(np.complex128)
@@ -108,3 +109,33 @@ amplitude_image.save("reconstructed_amplitude_angular_spectrum.png")
 phase_image = Image.fromarray((phase / np.max(phase) * 255).astype(np.uint8))
 phase_image = phase_image.convert("L")
 phase_image.save("reconstructed_phase_angular_spectrum.png")
+
+# Create a figure to display the images in a grid
+fig, axs = plt.subplots(1, 3, figsize=(18, 6))
+
+# Plot the contrast image
+axs[0].imshow(holoDat1, cmap="gray", extent=[-dimX / 2, dimX / 2, -dimY / 2, dimY / 2])
+axs[0].set_title("Contrast Image")
+axs[0].set_xlabel("x [pix]")
+axs[0].set_ylabel("y [pix]")
+
+# Plot the reconstructed amplitude
+axs[1].imshow(amplitude, cmap="gray", extent=[-dimX / 2, dimX / 2, -dimY / 2, dimY / 2])
+axs[1].set_title("Reconstructed Amplitude")
+axs[1].set_xlabel("x [pix]")
+axs[1].set_ylabel("y [pix]")
+
+# Plot the reconstructed phase
+axs[2].imshow(phase, cmap="gray", extent=[-dimX / 2, dimX / 2, -dimY / 2, dimY / 2])
+axs[2].set_title("Reconstructed Phase")
+axs[2].set_xlabel("x [pix]")
+axs[2].set_ylabel("y [pix]")
+
+# Adjust layout and show the plot
+plt.tight_layout()
+plt.show()
+
+# Save the figure with the image grid
+fig.savefig("image_grid.png")
+
+# ------------------- Particle Analysis -------------------
