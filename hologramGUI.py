@@ -1,11 +1,10 @@
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 import matplotlib.pyplot as plt
-from PIL import Image, ImageTk
+from PIL import Image
 from pyDHM import numericalPropagation
 from skimage.filters import threshold_otsu
 from skimage.morphology import closing, opening, square
-from skimage.measure import label, regionprops
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg

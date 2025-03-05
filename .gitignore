@@ -8,3 +8,4 @@ hologram_simplified.py
 *.bmp
 *.jpg
 *.png
+/testfiles/
